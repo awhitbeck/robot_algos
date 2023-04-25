@@ -1,7 +1,6 @@
 import random
 import matplotlib.pyplot as plt
 import numpy as np
-import zmq
 
 # generate 85 pairs of random numbers
 def generate_points():
@@ -102,3 +101,18 @@ def test():
 
     plt.scatter(pull[:,0],pull[:,1])
     plt.show()
+
+"""
+move to next feature
+take image
+get features
+if first attempt, all features are added to  feature list
+else,
+    use ICP to match features to feature list and get transformation
+    if transformation is too large, 
+        skip this feature
+    else
+        use transformation to put current list of features in the same frame as the feature list
+        check if any features are within a certain distance of the feature list
+        if no, add to feature list and move to next feature
+"""
