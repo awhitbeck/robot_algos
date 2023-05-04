@@ -1,6 +1,7 @@
 import random
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.neighbors import NearestNeighbors
 
 # generate 85 pairs of random numbers
 def generate_points():
@@ -27,7 +28,54 @@ def transform(points, theta=0., tx=0., ty=0., scale=1.):
 
     return np.array(points)
 
+def make_correspondence(reference_points, query_points, max_distance=100):
+    ## this function assumes that the mean of reference_points and query_points is zero
+
+    nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(reference_points)
+    distances, indices = nbrs.kneighbors(query_points)
+    ref=[]
+    que=[]
+    for i in range(len(distances)):
+        if distances[i][0] < 100:
+            #print("reference_points: ",reference_points[indices[i]][0])
+            #print("query_points: ",query_points[i])
+
+            ref.append(reference_points[indices[i]][0])
+            que.append(query_points[i])
+    return np.array(ref),np.array(que)
+
 def iterative_closest_point(source, target, max_iterations=20, tolerance=0.001):
+
+    err = 99999999999999.
+    iteration = 0
+    #print("source: ",source)
+    #print("target: ",target)
+    rotation = [[1.,0.],[0.,1.]]
+    translation = [0.,0.]
+    mean_source = np.mean(source, axis=0)
+    mean_target = np.mean(target, axis=0)
+    source = source - mean_source
+    target = target - mean_target
+    while iteration < max_iterations :
+        # find correspondences between source and target
+        target_corr,source_corr = make_correspondence(target,source)
+
+        t,err_ = rigid_body_transformation(source_corr,target_corr)
+        rotation = t[:2,:2]
+        translation = t[:2,2]
+        if abs(err - err_)/(err+err_) < tolerance :
+            return rotation,translation+mean_source-mean_target,err_
+        else :
+            err = err_
+            source = np.dot(source,rotation) + translation
+            iteration += 1
+            #print("iteration: ",iteration)
+            #print("error: ",err_)
+            #print("translation: ",translation+mean_source-mean_target)
+            #print("rotation: ",rotation)
+
+    return rotation, translation+mean_source-mean_target, err
+def rigid_body_transformation(source, target):
     # initialize the transformation to the identity
     transformation = np.eye(3)
 
@@ -74,33 +122,41 @@ def test():
     err=[]
     pull=np.array([])
 
-    shiftx=-2000
-    shifty=100
-    ntrials=1000
+    shiftx=-100
+    shifty=300
+    ntrials=200
+    #delete x% of points
+    x=0.5
     for i in range(ntrials):
         points = generate_points()
-
-        #delete x% of points
-        x=0.5
-        points = np.delete(points, np.random.choice(points.shape[0], int(points.shape[0]*x), replace=False), axis=0)
-
+        #print("first point: ",points[0])
+        #print("number of points: ",points.shape[0])
         #add randome noise to points
         points_ = transform(points,0.,shiftx,shifty)
-        points_ = points_ + np.random.normal(0, 400, points.shape)
-        trans_, err_ = iterative_closest_point(points,points_)
-        pull =  np.append(pull,[trans_[0,2],trans_[1,2]])
+        #print("first point_: ",points_[0])
+        points_ = np.delete(points_, np.random.choice(points_.shape[0], int(points_.shape[0]*x), replace=False), axis=0)
+        #print("first point_: ",points_[0])
+        points_ = points_ + np.random.normal(0, 50, points_.shape)
+        #print("number of points_: ",points_.shape[0])
+        rot_, trans_, err_ = iterative_closest_point(points,points_)
+        pull =  np.append(pull,[trans_[0],trans_[1]])
         err.append(err_)
 
     pull = pull.reshape(ntrials,2)
-    print(pull)
-    print(np.mean(err),np.std(err))
+    #print(pull)
+    #print(np.mean(err),np.std(err))
     plt.hist(err)
-    #plt.scatter(points[:,0],points[:,1])
+    plt.show()
+    plt.scatter(pull[:,0],pull[:,1],alpha=0.1)
     #plt.scatter(points_[:,0],points_[:,1])
     plt.show()
 
-    plt.scatter(pull[:,0],pull[:,1])
-    plt.show()
+    #plt.scatter(pull[:,0],pull[:,1])
+    #plt.show()
+
+##run test function when this file is run
+if __name__ == "__main__":
+    test()
 
 """
 move to next feature
